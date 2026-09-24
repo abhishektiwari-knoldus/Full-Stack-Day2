@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Employee Roster</title>
+<style>
+  :root { --paper:#eef1ee; --card:#fbfcfb; --ink:#1b2a2f; --muted:#5d6b6e; --pine:#2f5d50; --brass:#b8862b; --alert:#a63d2f; --line:#d3dad6; }
+  @media (prefers-color-scheme: dark) {
+    :root { --paper:#151d20; --card:#1d282c; --ink:#e7ecea; --muted:#9fb0b0; --pine:#6fb59f; --brass:#d6a94a; --alert:#e58a7c; --line:#30403f; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  h1, h2, h3 { font-family: "Iowan Old Style", Georgia, serif; font-weight:600; margin:0; }
+  header { padding:28px 32px 8px; display:flex; align-items:baseline; gap:16px; flex-wrap:wrap; }
+  header h1 { font-size:2rem; }
+  header p { margin:0; color:var(--muted); }
+  .layout { display:grid; grid-template-columns:320px 1fr; gap:24px; padding:16px 32px 40px; align-items:start; }
+  @media (max-width:820px) { .layout { grid-template-columns:1fr; padding:16px; } header { padding:20px 16px 0; } }
+  form, .results { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px; margin-bottom:16px; }
+  form h3 { font-size:1.05rem; margin-bottom:10px; }
+  label { display:block; font-size:.875rem; color:var(--muted); margin-top:8px; }
+  input[type=text], input[type=number] { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:var(--paper); color:var(--ink); font:inherit; }
+  .check { display:flex; gap:8px; align-items:center; color:var(--ink); }
+  button { margin-top:12px; padding:8px 14px; border:0; border-radius:6px; background:var(--pine); color:#fff; font:inherit; font-weight:600; cursor:pointer; }
+  @media (prefers-color-scheme: dark) { button { color:#10201b; } }
+  :focus-visible { outline:3px solid var(--brass); outline-offset:2px; }
+  .results h2 { font-size:1.5rem; margin-bottom:12px; display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap; }
+  .results h2 a { font:.9rem system-ui, sans-serif; color:var(--pine); }
+  .notice { padding:10px 12px; border-radius:6px; margin-bottom:12px; border-left:4px solid; }
+  .notice.error { border-color:var(--alert); color:var(--alert); background:color-mix(in srgb, var(--alert) 10%, transparent); }
+  .notice.ok { border-color:var(--pine); color:var(--pine); background:color-mix(in srgb, var(--pine) 10%, transparent); }
+  .scroll { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; }
+  th, td { text-align:left; padding:10px 8px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  th { font-size:.85rem; color:var(--muted); font-weight:600; }
+  td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
+  .pill { display:inline-block; padding:1px 10px; border-radius:99px; font-size:.8rem; border:1px solid var(--muted); color:var(--muted); }
+  .pill.on { background:var(--pine); border-color:var(--pine); color:#fff; }
+  @media (prefers-color-scheme: dark) { .pill.on { color:#10201b; } }
+  .empty { color:var(--muted); padding:16px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Employee Roster</h1>
+  <p th:text="${total} + (${total} == 1 ? ' employee on file' : ' employees on file')">4 employees on file</p>
+</header>
+
+<div class="layout">
+  <aside>
+    <form th:action="@{/employees}" method="post">
+      <h3>Add an employee</h3>
+      <label for="id">Employee ID</label>
+      <input id="id" name="id" type="number" min="1" required>
+      <label for="name">Name</label>
+      <input id="name" name="name" type="text" required>
+      <label for="department">Department</label>
+      <input id="department" name="department" type="text" list="depts" required>
+      <label for="salary">Salary</label>
+      <input id="salary" name="salary" type="number" min="0" step="any" required>
+      <label class="check"><input type="checkbox" name="active" value="true" checked> Active</label>
+      <button type="submit">Add employee</button>
+    </form>
+
+    <form th:action="@{/search/id}" method="get">
+      <h3>Find by ID</h3>
+      <label for="sid">Employee ID</label>
+      <input id="sid" name="id" type="number" required>
+      <button type="submit">Find employee</button>
+    </form>
+
+    <form th:action="@{/search/department}" method="get">
+      <h3>Show a department</h3>
+      <label for="sdept">Department</label>
+      <input id="sdept" name="department" type="text" list="depts" required>
+      <button type="submit">Show department</button>
+    </form>
+
+    <form th:action="@{/search/active-above}" method="get">
+      <h3>Active employees by salary</h3>
+      <label for="min">Salary greater than</label>
+      <input id="min" name="minSalary" type="number" min="0" step="any" value="100000" required>
+      <button type="submit">Show active employees</button>
+    </form>
+
+    <datalist id="depts"><option th:each="d : ${departments}" th:value="${d}"></option></datalist>
+  </aside>
+
+  <main class="results">
+    <h2><span th:text="${heading}">All employees</span><a th:href="@{/}">Show all employees</a></h2>
+    <div class="notice error" role="alert" th:if="${error}" th:text="${error}"></div>
+    <div class="notice ok" role="status" th:if="${message}" th:text="${message}"></div>
+
+    <div class="scroll" th:if="${!employees.isEmpty()}">
+      <table>
+        <thead><tr><th>ID</th><th>Name</th><th>Department</th><th class="num">Salary</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr th:each="e : ${employees}">
+            <td th:text="${e.id}">101</td>
+            <td th:text="${e.name}">Alex</td>
+            <td th:text="${e.department}">Engineering</td>
+            <td class="num" th:text="${#numbers.formatDecimal(e.salary, 1, 'COMMA', 0, 'POINT')}">90,000</td>
+            <td><span class="pill" th:classappend="${e.active} ? 'on'" th:text="${e.active} ? 'Active' : 'Inactive'">Active</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="empty" th:if="${employees.isEmpty() and error == null}">No employees yet. Add one using the form.</p>
+  </main>
+</div>
+</body>
+</html>
